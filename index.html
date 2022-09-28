@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gist Lister</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.1.0/github-markdown-dark.min.css" integrity="sha512-1d9gwwC3dNW3O+lGwY8zTQrh08a41Ejci46DdzY1aQbqi/7Qr8Asp4ycWPsoD52tKXKrgu8h/lSpig1aAkvlMw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+<style>
+  body {
+    margin: 0;
+    padding: 2.5em;
+    box-sizing: border-box;
+  }
+
+  .markdown-body {
+    min-width: 200px;
+    max-width: 980px;
+    margin: 0 auto;
+  }
+
+  .github-limits {
+    margin-top: 1em;
+    margin-bottom: 2em;
+  }
+
+  .gists ul {
+    list-style-type: none;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  @media (max-width: 767px) {
+    .markdown-body {
+      padding: 15px;
+    }
+
+    td, th {
+      word-break: break-word;
+      min-width: 75px;
+      font-size: 0.9em;
+    }
+  }
+
+  @media (max-width: 467px) {
+    .markdown-body {
+      padding: 10px;
+    }
+
+    td, th {
+      min-width: 70px;
+      font-size: 0.8em;
+    }
+  }
+</style>
+</head>
+<body class="markdown-body">
+  <h1>Gist Lister</h1>
+  <div>
+    <form class="gist-search">
+      <input
+        class="github-username"
+        placeholder="Enter a GitHub username"
+        value="gaearon"
+        autofocus
+      >
+      <input type="submit" value="search">
+    </form>
+  </div>
+  <div class="github-limits"></div>
+  <div class="gists"></div>
+<script>
+
+const fetchJson = (...args) => fetch(...args).then(async response => {
+  const {headers} = response;
+  const limits = {
+    remaining: headers.get("x-ratelimit-remaining"),
+    limit: headers.get("x-ratelimit-limit"),
+    reset: new Date(headers.get("x-ratelimit-reset") * 1000),
+  };
+
+  if (!response.ok) {
+    const err = Error(response.status);
+    err.limits = limits;
+    throw err;
+  }
+
+  return {limits, payload: await response.json()};
+});
+
+const fetchGists = async (username, maxPages=10) => {
+  const gists = [];
+  let limits;
+
+  for (let page = 1; page <= maxPages; page++) {
+    const url = `https://api.github.com/users/${username}/gists?page=${page}`;
+    const {limits: lastLimits, payload: chunk} = await fetchJson(url);
+    limits = lastLimits;
+
+    if (chunk.length === 0) {
+      break;
+    }
+ 
+    gists.push(...chunk);
+  }
+
+  return {limits, gists};
+};
+
+document.querySelector(".gist-search").addEventListener("submit", event => {
+  event.preventDefault();
+  fetchGists(event.target.querySelector(".github-username").value)
+    .then(({gists, limits}) => {
+      document.querySelector(".gists").innerHTML = gists.length ? `
+      <table>
+      <tbody>
+        <tr>
+          <th>Description</th>
+          <th>Files</th>
+          <th>Created</th>
+          <th>Updated</th>
+        </tr>
+      ` +
+      gists.map(e => `
+        <tr>
+          <td>
+            <a href="${e.html_url}">
+              ${e.description}
+            </a>
+          </td>
+          <td>
+            <ul>
+            ${Object.values(e.files)
+              .map(e => `<li><a href="${e.raw_url}">${e.filename}</a></li>`)
+              .join("")}
+            </ul>
+          </td>
+          <td>
+            ${e.created_at.slice(0, 10)}
+          </td>
+          <td>
+            ${e.updated_at.slice(0, 10)}
+          </td>
+        </tr>
+      `).join("")+ `
+        </table>
+        </tbody>
+      ` : "<div>No gists found</div>";
+
+      document.querySelector(".github-limits").innerHTML =
+        `<small><em>${limits.remaining}/${limits.limit} API requests remaining.
+          Usage resets at ${limits.reset}.</em></small>`;
+    })
+    .catch(err => console.log(err, err.limits));
+});
+
+</script>
+</body>
+</html>
