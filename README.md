@@ -1,6 +1,6 @@
 # gist-list
 
-This tool offers an easier way to see a user's gists than clicking through pages on the normal gist UI.
+This tool offers an easier way to see a user's GitHub gists than clicking through pages on the normal gist UI.
 
 Try it: <https://ggorlen.github.io/gist-list>
 
