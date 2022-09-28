@@ -1,6 +1,6 @@
 # gist-list
 
-This tool offers an easier way to see a user's GitHub gists than clicking through pages on the normal gist UI.
+An easier way to see a user's GitHub gists than clicking through pages on the normal gist UI.
 
 Try it: <https://ggorlen.github.io/gist-list>
 
@@ -10,6 +10,7 @@ Try it: <https://ggorlen.github.io/gist-list>
 - Save most recent response to local storage to save API calls
 - Enable sorting on table rows
 - Clean up code
+- Disable input and show "loading" when request is in flight
 - Improve small screen responsiveness
 - OK-looking classless CSS options:
   - Hack CSS
