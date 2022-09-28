@@ -10,6 +10,7 @@ Try it: <https://ggorlen.github.io/gist-list>
 - Save most recent response to local storage to save API calls
 - Enable sorting on table rows
 - Clean up code
+- Query param `?username=` for auto-searching a user's gists
 - Disable input and show "loading" when request is in flight
 - Improve small screen responsiveness
 - OK-looking classless CSS options:
