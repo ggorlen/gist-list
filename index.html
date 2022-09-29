@@ -137,7 +137,8 @@ document.querySelector(".gist-search").addEventListener("submit", event => {
         <tr>
           <td>
             <a href="${e.html_url}">
-              ${e.description || "<em>no description</em>"}
+              ${e.description || (Object.keys(e.files).length ?
+                Object.values(e.files)[0].filename : "<em>no description</em>")}
             </a>
           </td>
           <td>
