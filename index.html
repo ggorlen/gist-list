@@ -137,7 +137,7 @@ document.querySelector(".gist-search").addEventListener("submit", event => {
         <tr>
           <td>
             <a href="${e.html_url}">
-              ${e.description}
+              ${e.description || "<em>no description</em>"}
             </a>
           </td>
           <td>
