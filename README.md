@@ -13,6 +13,8 @@ Try it: <https://ggorlen.github.io/gist-list>
 - Query param `?username=` for auto-searching a user's gists
 - Disable input and show "loading" when request is in flight
 - Improve small screen responsiveness
+- Fetch repos too
+- Maybe run a few requests in parallel to speed up response time
 - OK-looking classless CSS options:
   - Hack CSS
   - GH markdown
