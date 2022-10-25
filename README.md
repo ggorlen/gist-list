@@ -6,7 +6,6 @@ Try it: <https://ggorlen.github.io/gist-list>
 
 ### TODO
 
-- Disable input and show "loading" when request is in flight
 - Allow pagination for users with more than 10 pages of gists
 - Improve small screen responsiveness
 - Clean up code

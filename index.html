@@ -115,7 +115,7 @@ const fetchJson = (...args) => fetch(...args).then(async response => {
   };
 
   if (!response.ok) {
-    const err = Error(response.status);
+    const err = Error(response.statusText);
     err.limits = limits;
     throw err;
   }
@@ -146,7 +146,7 @@ const firstFile = gist =>
   Object.keys(gist.files).length
     ? Object.values(gist.files)[0].filename : "";
 
-const gistToHTML = gist => `
+const gistTableRow = gist => `
   <tr>
     <td>
       <a href="${gist.html_url}">
@@ -176,20 +176,21 @@ const gistToHTML = gist => `
   </tr>
 `;
 
+const gistsTable = gists => 
+  gists.length === 0 ? "<div>No gists found</div>" : `
+  <table>
+    <tbody>
+      <tr>
+        ${headers.map(({name}) => `<th>${name}</th>`).join("")}
+      </tr>
+      ${gists.map(gistTableRow).join("")}
+    </tbody>
+  </table>
+`;
+
 const gistsToDOM = gists => {
   const gistsEl = document.querySelector(".gists");
-  gistsEl.innerHTML = gists.length === 0
-    ? "<div>No gists found</div>"
-    : `
-      <table>
-        <tbody>
-          <tr>
-            ${headers.map(({name}) => `<th>${name}</th>`).join("")}
-          </tr>
-          ${gists.map(gistToHTML).join("")}
-        </tbody>
-      </table>
-    `;
+  gistsEl.innerHTML = gistsTable(gists);
   gistsEl.querySelectorAll("th").forEach(e => {
     e.addEventListener("click", ({target: {textContent}}) => {
       let {key, ascending} = headers.find(e => e.name === textContent);
@@ -199,8 +200,8 @@ const gistsToDOM = gists => {
         ascending = e.classList.contains("sorted-desc");
       }
       else {
-        gists.sort((a, b) => key(a).localeCompare(key(b)));
         sortedBy = textContent;
+        gists.sort((a, b) => key(a).localeCompare(key(b)));
 
         if (!ascending) {
           gists.reverse();
@@ -208,11 +209,7 @@ const gistsToDOM = gists => {
       }
 
       gistsToDOM(gists);
-      gistsEl.querySelectorAll("th").forEach(e => {
-        if (e.textContent === sortedBy) {
-          e.classList.add(ascending ? "sorted-asc" : "sorted-desc");
-        }
-      });
+      showSortedIcon(ascending);
     });
   });
 };
@@ -228,11 +225,7 @@ const limitsToDOM = limits => {
   `;
 };
 
-const handleGistsResponse = response => {
-  ({limits, gists} = response);
-  limitsToDOM(limits);
-  gistsToDOM(gists);
-  const {ascending} = headers.find(e => e.name === sortedBy);
+const showSortedIcon = ascending => {
   document.querySelectorAll(".gists th").forEach(e => {
     if (e.textContent === sortedBy) {
       e.classList.add(ascending ? "sorted-asc" : "sorted-desc");
@@ -240,12 +233,38 @@ const handleGistsResponse = response => {
   });
 };
 
-document.querySelector(".gist-search")
-  .addEventListener("submit", event => {
-    event.preventDefault();
-    const {value} = event.target.querySelector(".github-username");
-    window.location.search = `?username=${value}`;
-  });
+const handleGistsResponse = response => {
+  ({limits, gists} = response);
+  limitsToDOM(limits);
+  gistsToDOM(gists);
+  showSortedIcon(headers.find(e => e.name === sortedBy).ascending);
+};
+
+const handleError = err => {
+  console.error(err, err.limits);
+  const gistsEl = document.querySelector(".gists");
+  gistsEl.innerHTML = err.message;
+  limitsToDOM(err.limits);
+};
+
+const searchGists = username => {
+  const submit = document.querySelector(".gist-search [type='submit']");
+  submit.disabled = true;
+  fetchGists(username)
+    .then(handleGistsResponse)
+    .catch(handleError)
+    .finally(() => submit.disabled = false);
+};
+
+const setFromURLSearchParam = () => {
+  const username = new URLSearchParams(window.location.search).get("username");
+  
+  if (username) {
+    const unEl = document.querySelector(".github-username");
+    unEl.value = username;
+    searchGists(username);
+  }
+};
 
 let limits;
 let gists;
@@ -272,15 +291,15 @@ const headers = [
     ascending: false,
   },
 ];
-const username = new URLSearchParams(window.location.search).get("username");
 
-if (username) {
-  const unEl = document.querySelector(".github-username");
-  unEl.value = username;
-  fetchGists(username)
-    .then(handleGistsResponse)
-    .catch(err => console.error(err, err.limits));
-}
+document.querySelector(".gist-search")
+  .addEventListener("submit", event => {
+    event.preventDefault();
+    const {value} = event.target.querySelector(".github-username");
+    window.location.search = `?username=${value}`;
+  });
+
+setFromURLSearchParam();
 
 </script>
 </body>
