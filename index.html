@@ -31,10 +31,34 @@
     margin: 0 !important;
   }
 
+  .gists th {
+    cursor: pointer;
+    position: relative;
+  }
+
+  .gists .sorted-desc:after {
+    position: absolute;
+    right: 0.5em;
+    content: "\25BC";
+    font-size: 0.8em;
+  }
+
+  .gists .sorted-asc:after {
+    position: absolute;
+    right: 0.5em;
+    content: "\25B2";
+    font-size: 0.8em;
+  }
+
   .github-logo {
     position: absolute;
     right: 1.5em;
     top: 1.5em;
+  }
+
+  td, th {
+    min-width: 75px;
+    font-size: 0.9em;
   }
 
   @media (max-width: 767px) {
@@ -44,8 +68,6 @@
 
     td, th {
       word-break: break-word;
-      min-width: 75px;
-      font-size: 0.9em;
     }
   }
 
@@ -73,7 +95,6 @@
       <input
         class="github-username"
         placeholder="Enter a GitHub username"
-        value="ggorlen"
         autofocus
       >
       <input type="submit" value="search">
@@ -82,6 +103,8 @@
   <div class="github-limits"></div>
   <div class="gists"></div>
 <script>
+
+"use strict";
 
 const fetchJson = (...args) => fetch(...args).then(async response => {
   const {headers} = response;
@@ -119,53 +142,157 @@ const fetchGists = async (username, maxPages=10) => {
   return {limits, gists};
 };
 
-document.querySelector(".gist-search").addEventListener("submit", event => {
-  event.preventDefault();
-  fetchGists(event.target.querySelector(".github-username").value)
-    .then(({gists, limits}) => {
-      document.querySelector(".gists").innerHTML = gists.length ? `
-      <table>
-      <tbody>
-        <tr>
-          <th>Description</th>
-          <th>Files</th>
-          <th>Created</th>
-          <th>Updated</th>
-        </tr>
-      ` +
-      gists.map(e => `
-        <tr>
-          <td>
-            <a href="${e.html_url}">
-              ${e.description || (Object.keys(e.files).length ?
-                Object.values(e.files)[0].filename : "<em>no description</em>")}
-            </a>
-          </td>
-          <td>
-            <ul>
-            ${Object.values(e.files)
-              .map(e => `<li><a href="${e.raw_url}">${e.filename}</a></li>`)
-              .join("")}
-            </ul>
-          </td>
-          <td>
-            ${e.created_at.slice(0, 10)}
-          </td>
-          <td>
-            ${e.updated_at.slice(0, 10)}
-          </td>
-        </tr>
-      `).join("")+ `
-        </table>
-        </tbody>
-      ` : "<div>No gists found</div>";
+const firstFile = gist =>
+  Object.keys(gist.files).length
+    ? Object.values(gist.files)[0].filename : "";
 
-      document.querySelector(".github-limits").innerHTML =
-        `<small><em>${limits.remaining}/${limits.limit} API requests remaining.
-          Usage resets at ${limits.reset}.</em></small>`;
+const gistToHTML = gist => `
+  <tr>
+    <td>
+      <a href="${gist.html_url}">
+        ${gist.description || (
+          Object.keys(gist.files).length
+            ? firstFile(gist)
+            : "<em>no description</em>"
+          )
+        }
+      </a>
+    </td>
+    <td>
+      <ul>
+      ${Object.values(gist.files)
+        .map(e => `
+          <li><a href="${e.raw_url}">${e.filename}</a></li>
+        `)
+        .join("")}
+      </ul>
+    </td>
+    <td>
+      ${gist.created_at.slice(0, 10)}
+    </td>
+    <td>
+      ${gist.updated_at.slice(0, 10)}
+    </td>
+  </tr>
+`;
+
+const gistsToDOM = gists => {
+  const gistsEl = document.querySelector(".gists");
+  gistsEl.innerHTML = gists.length === 0
+    ? "<div>No gists found</div>"
+    : `
+      <table>
+        <tbody>
+          <tr>
+            ${headers.map(({name}) => `<th>${name}</th>`).join("")}
+          </tr>
+          ${gists.map(gistToHTML).join("")}
+        </tbody>
+      </table>
+    `;
+  gistsEl.querySelectorAll("th").forEach(e => {
+    e.addEventListener("click", ({target: {textContent}}) => {
+      let {key, ascending} = headers.find(e => e.name === textContent);
+
+      if (sortedBy === textContent) {
+        gists.reverse();
+        ascending = e.classList.contains("sorted-desc");
+      }
+      else {
+        gists.sort((a, b) => key(a).localeCompare(key(b)));
+        sortedBy = textContent;
+
+        if (!ascending) {
+          gists.reverse();
+        }
+      }
+
+      gistsToDOM(gists);
+      gistsEl.querySelectorAll("th").forEach(e => {
+        if (e.textContent === sortedBy) {
+          e.classList.add(ascending ? "sorted-asc" : "sorted-desc");
+        }
+      });
+    });
+  });
+};
+
+const limitsToDOM = limits => {
+  document.querySelector(".github-limits").innerHTML = `
+    <small>
+      <em>
+        ${limits.remaining}/${limits.limit} API requests remaining.
+        Usage resets at ${limits.reset}.
+      </em>
+    </small>
+  `;
+};
+
+const handleGistsResponse = response => {
+  ({limits, gists} = response);
+  limitsToDOM(limits);
+  gistsToDOM(gists);
+};
+
+document.querySelector(".gist-search")
+  .addEventListener("submit", event => {
+    event.preventDefault();
+    const {value} = event.target.querySelector(".github-username");
+    window.location.search = `?username=${value}`;
+    fetchGists(value)
+      .then(handleGistsResponse)
+      .catch(err => console.error(err, err.limits));
+  });
+
+let limits;
+let gists;
+let sortedBy = "Created";
+const headers = [
+  {
+    name: "Description",
+    key: e => e.description || firstFile(e),
+    ascending: true,
+  },
+  {
+    name: "Files",
+    key: firstFile,
+    ascending: true,
+  },
+  {
+    name: "Created",
+    key: e => e.created_at,
+    ascending: false,
+  },
+  {
+    name: "Updated",
+    key: e => e.updated_at,
+    ascending: false,
+  },
+];
+const username = new URLSearchParams(window.location.search).get("username");
+
+if (username) {
+  const unEl = document.querySelector(".github-username");
+  unEl.value = username;
+  fetchGists(username)
+    .then(gistResponse => {
+      handleGistsResponse(gistResponse);
+      const {ascending} = headers.find(e => e.name === sortedBy);
+      document.querySelectorAll(".gists th").forEach(e => {
+        if (e.textContent === sortedBy) {
+          e.classList.add(ascending ? "sorted-asc" : "sorted-desc");
+        }
+      });
     })
-    .catch(err => console.log(err, err.limits));
-});
+    .catch(err => console.error(err, err.limits));
+
+  const {ascending} = headers.find(e => e.name === sortedBy);
+  document.querySelectorAll(".gists th").forEach(e => {
+    if (e.textContent === sortedBy) {
+      e.classList.add(ascending ? "sorted-asc" : "sorted-desc");
+    }
+  });
+}
 
 </script>
 </body>

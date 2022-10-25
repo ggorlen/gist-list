@@ -6,14 +6,13 @@ Try it: <https://ggorlen.github.io/gist-list>
 
 ### TODO
 
-- Allow pagination for users with more than 10 pages of gists
-- Save most recent response to local storage to save API calls
-- Enable sorting on table rows
-- Clean up code
-- Query param `?username=` for auto-searching a user's gists
 - Disable input and show "loading" when request is in flight
+- Allow pagination for users with more than 10 pages of gists
 - Improve small screen responsiveness
+- Clean up code
 - Fetch repos too
+- Show count of gists
+- Save most recent response to local storage to save API calls? (or stick to browser cache)
 - Maybe run a few requests in parallel to speed up response time
 - OK-looking classless CSS options:
   - Hack CSS
