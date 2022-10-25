@@ -59,15 +59,12 @@
   td, th {
     min-width: 75px;
     font-size: 0.9em;
+    word-break: break-word;
   }
 
   @media (max-width: 767px) {
     .markdown-body {
       padding: 15px;
-    }
-
-    td, th {
-      word-break: break-word;
     }
   }
 
@@ -106,6 +103,19 @@
 
 "use strict";
 
+class GHRequestError extends Error {
+  constructor(limits = {}, ...params) {
+    super(...params);
+
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, GHRequestError);
+    }
+
+    this.name = "GHRequestError";
+    this.limits = limits;
+  }
+}
+
 const fetchJson = (...args) => fetch(...args).then(async response => {
   const {headers} = response;
   const limits = {
@@ -115,9 +125,8 @@ const fetchJson = (...args) => fetch(...args).then(async response => {
   };
 
   if (!response.ok) {
-    const err = Error(response.statusText);
-    err.limits = limits;
-    throw err;
+    const message = response.statusText || response.status;
+    throw new GHRequestError(limits, message);
   }
 
   return {limits, payload: await response.json()};
@@ -146,26 +155,35 @@ const firstFile = gist =>
   Object.keys(gist.files).length
     ? Object.values(gist.files)[0].filename : "";
 
+
+const gistDescription = gist => `
+  <a href="${gist.html_url}">
+    ${gist.description || (
+      Object.keys(gist.files).length
+        ? firstFile(gist)
+        : "<em>no description</em>"
+      )
+    }
+  </a>
+`;
+
+const gistFiles = gist => `
+  <ul>
+  ${Object.values(gist.files)
+    .map(e => `
+      <li><a href="${e.raw_url}">${e.filename}</a></li>
+    `)
+    .join("")}
+  </ul>
+`;
+
 const gistTableRow = gist => `
   <tr>
     <td>
-      <a href="${gist.html_url}">
-        ${gist.description || (
-          Object.keys(gist.files).length
-            ? firstFile(gist)
-            : "<em>no description</em>"
-          )
-        }
-      </a>
+      ${gistDescription(gist)}
     </td>
     <td>
-      <ul>
-      ${Object.values(gist.files)
-        .map(e => `
-          <li><a href="${e.raw_url}">${e.filename}</a></li>
-        `)
-        .join("")}
-      </ul>
+      ${gistFiles(gist)}
     </td>
     <td>
       ${gist.created_at.slice(0, 10)}
@@ -188,30 +206,31 @@ const gistsTable = gists =>
   </table>
 `;
 
-const gistsToDOM = gists => {
-  const gistsEl = document.querySelector(".gists");
-  gistsEl.innerHTML = gistsTable(gists);
-  gistsEl.querySelectorAll("th").forEach(e => {
-    e.addEventListener("click", ({target: {textContent}}) => {
-      let {key, ascending} = headers.find(e => e.name === textContent);
+const listenToHeaderClick = header => {
+  header.addEventListener("click", ({target: {textContent}}) => {
+    let {key, ascending} = headers.find(e => e.name === textContent);
 
-      if (sortedBy === textContent) {
+    if (sortedBy === textContent) {
+      gists.reverse();
+      ascending = header.classList.contains("sorted-desc");
+    }
+    else {
+      sortedBy = textContent;
+      gists.sort((a, b) => key(a).localeCompare(key(b)));
+
+      if (!ascending) {
         gists.reverse();
-        ascending = e.classList.contains("sorted-desc");
       }
-      else {
-        sortedBy = textContent;
-        gists.sort((a, b) => key(a).localeCompare(key(b)));
+    }
 
-        if (!ascending) {
-          gists.reverse();
-        }
-      }
-
-      gistsToDOM(gists);
-      showSortedIcon(ascending);
-    });
+    gistsToDOM(gists);
+    showSortedIcon(ascending);
   });
+};
+
+const gistsToDOM = gists => {
+  document.querySelector(".gists").innerHTML = gistsTable(gists);
+  document.querySelectorAll(".gists th").forEach(listenToHeaderClick);
 };
 
 const limitsToDOM = limits => {
@@ -241,7 +260,6 @@ const handleGistsResponse = response => {
 };
 
 const handleError = err => {
-  console.error(err, err.limits);
   const gistsEl = document.querySelector(".gists");
   gistsEl.innerHTML = err.message;
   limitsToDOM(err.limits);
@@ -256,7 +274,7 @@ const searchGists = username => {
     .finally(() => submit.disabled = false);
 };
 
-const setFromURLSearchParam = () => {
+const trySearchFromURLParam = () => {
   const username = new URLSearchParams(window.location.search).get("username");
   
   if (username) {
@@ -266,10 +284,20 @@ const setFromURLSearchParam = () => {
   }
 };
 
+const listenForSubmit = () => {
+  document.querySelector(".gist-search")
+    .addEventListener("submit", event => {
+      event.preventDefault();
+      const {value} = event.target.querySelector(".github-username");
+      window.location.search = `?username=${value}`;
+    });
+};
+
 let limits;
 let gists;
 let sortedBy = "Created";
-const headers = [
+
+const headers = Object.freeze([
   {
     name: "Description",
     key: e => e.description || firstFile(e),
@@ -290,16 +318,10 @@ const headers = [
     key: e => e.updated_at,
     ascending: false,
   },
-];
+]);
 
-document.querySelector(".gist-search")
-  .addEventListener("submit", event => {
-    event.preventDefault();
-    const {value} = event.target.querySelector(".github-username");
-    window.location.search = `?username=${value}`;
-  });
-
-setFromURLSearchParam();
+trySearchFromURLParam();
+listenForSubmit();
 
 </script>
 </body>
