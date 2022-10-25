@@ -232,6 +232,12 @@ const handleGistsResponse = response => {
   ({limits, gists} = response);
   limitsToDOM(limits);
   gistsToDOM(gists);
+  const {ascending} = headers.find(e => e.name === sortedBy);
+  document.querySelectorAll(".gists th").forEach(e => {
+    if (e.textContent === sortedBy) {
+      e.classList.add(ascending ? "sorted-asc" : "sorted-desc");
+    }
+  });
 };
 
 document.querySelector(".gist-search")
@@ -239,9 +245,6 @@ document.querySelector(".gist-search")
     event.preventDefault();
     const {value} = event.target.querySelector(".github-username");
     window.location.search = `?username=${value}`;
-    fetchGists(value)
-      .then(handleGistsResponse)
-      .catch(err => console.error(err, err.limits));
   });
 
 let limits;
@@ -275,23 +278,8 @@ if (username) {
   const unEl = document.querySelector(".github-username");
   unEl.value = username;
   fetchGists(username)
-    .then(gistResponse => {
-      handleGistsResponse(gistResponse);
-      const {ascending} = headers.find(e => e.name === sortedBy);
-      document.querySelectorAll(".gists th").forEach(e => {
-        if (e.textContent === sortedBy) {
-          e.classList.add(ascending ? "sorted-asc" : "sorted-desc");
-        }
-      });
-    })
+    .then(handleGistsResponse)
     .catch(err => console.error(err, err.limits));
-
-  const {ascending} = headers.find(e => e.name === sortedBy);
-  document.querySelectorAll(".gists th").forEach(e => {
-    if (e.textContent === sortedBy) {
-      e.classList.add(ascending ? "sorted-asc" : "sorted-desc");
-    }
-  });
 }
 
 </script>
