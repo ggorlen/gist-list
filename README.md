@@ -7,6 +7,7 @@ Try it: <https://ggorlen.github.io/gist-list>
 ### TODO
 
 - Allow pagination for users with more than 10 pages of gists
+- add link to https://github.com/ggorlen/run-gist/
 - Improve small screen responsiveness
 - Fetch repos too
 - Show count of gists
