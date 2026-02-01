@@ -1,13 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gist List</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 16 16'><text x='0' y='14'>🗒️</text></svg>" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.8.1/github-markdown.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
-
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Gist List</title>
+<link
+  rel="icon"
+  href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 16 16'><text x='0' y='14'>🗒️</text></svg>"
+/>
+<link
+  rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.8.1/github-markdown.min.css"
+  crossorigin="anonymous"
+  referrerpolicy="no-referrer"
+/>
 <style>
   body {
     margin: 0;
@@ -51,13 +57,20 @@
     font-size: 0.8em;
   }
 
+  .loading-indicator {
+    padding: 1em 0;
+    color: #666;
+    font-style: italic;
+  }
+
   .github-logo {
     position: absolute;
     right: 1.5em;
     top: 1.5em;
   }
 
-  td, th {
+  td,
+  th {
     min-width: 75px;
     font-size: 0.9em;
   }
@@ -73,7 +86,8 @@
       padding: 10px;
     }
 
-    td, th {
+    td,
+    th {
       min-width: 70px;
       font-size: 0.8em;
     }
@@ -83,7 +97,12 @@
 <body class="markdown-body">
   <div class="github-logo">
     <a href="https://github.com/ggorlen/gist-list">
-      <img src="https://github.githubassets.com/images/modules/site/icons/footer/github-mark.svg" alt="GitHub mark" width="20" height="20">
+      <img
+        src="https://github.githubassets.com/images/modules/site/icons/footer/github-mark.svg"
+        alt="GitHub mark"
+        width="20"
+        height="20"
+      />
     </a>
   </div>
   <h1>Gist List</h1>
@@ -93,8 +112,8 @@
         class="github-username"
         placeholder="Enter a GitHub username"
         autofocus
-      >
-      <input type="submit" value="search">
+      />
+      <input type="submit" value="search" />
     </form>
   </div>
   <div class="github-limits"></div>
@@ -116,7 +135,8 @@ class GHRequestError extends Error {
   }
 }
 
-const fetchJson = (...args) => fetch(...args).then(async response => {
+const fetchJson = async (...args) => {
+  const response = await fetch(...args);
   const {headers} = response;
   const limits = {
     remaining: headers.get("x-ratelimit-remaining"),
@@ -129,40 +149,35 @@ const fetchJson = (...args) => fetch(...args).then(async response => {
     throw new GHRequestError(limits, message);
   }
 
+  console.log(limits, )
   return {limits, payload: await response.json()};
-});
+};
 
-const fetchGists = async (username, maxPages=10) => {
-  const gists = [];
-  let limits;
-
+const fetchGists = async ({username, handlePage, maxPages = 20}) => {
   for (let page = 1; page <= maxPages; page++) {
     const url = `https://api.github.com/users/${username}/gists?page=${page}`;
-    const {limits: lastLimits, payload: chunk} = await fetchJson(url);
-    limits = lastLimits;
+    const {limits, payload: chunk} = await fetchJson(url);
 
     if (chunk.length === 0) {
       break;
     }
- 
-    gists.push(...chunk);
-  }
 
-  return {limits, gists};
+    handlePage({chunk, limits});
+  }
 };
 
 const firstFile = gist =>
   Object.keys(gist.files).length
-    ? Object.values(gist.files)[0].filename : "";
-
+    ? Object.values(gist.files)[0].filename
+    : "";
 
 const gistDescription = gist => `
   <a href="${gist.html_url}">
-    ${gist.description || (
-      Object.keys(gist.files).length
+    ${
+      gist.description ||
+      (Object.keys(gist.files).length
         ? firstFile(gist)
-        : "<em>no description</em>"
-      )
+        : "<em>no description</em>")
     }
   </a>
 `;
@@ -170,9 +185,11 @@ const gistDescription = gist => `
 const gistFiles = gist => `
   <ul>
   ${Object.values(gist.files)
-    .map(e => `
+    .map(
+      (e) => `
       <li><a href="${e.raw_url}">${e.filename}</a></li>
-    `)
+    `
+    )
     .join("")}
   </ul>
 `;
@@ -186,16 +203,28 @@ const gistTableRow = gist => `
       ${gistFiles(gist)}
     </td>
     <td>
-      ${gist.created_at.slice(0, 10)}
+      ${gist.created_at.slice(0, 10).replaceAll("-", "/")}
     </td>
     <td>
-      ${gist.updated_at.slice(0, 10)}
+      ${gist.updated_at.slice(0, 10).replaceAll("-", "/")}
     </td>
   </tr>
 `;
 
-const gistsTable = gists => 
-  gists.length === 0 ? "<div>No gists found</div>" : `
+const gistsTable = gists => {
+  if (gists.length === 0 && !isLoading) {
+    return "<div>No gists found</div>";
+  }
+
+  const loadingIndicator = isLoading
+    ? `<div class="loading-indicator">Loading...</div>`
+    : "";
+
+  if (gists.length === 0) {
+    return loadingIndicator;
+  }
+
+  return `
   <table>
     <tbody>
       <tr>
@@ -204,27 +233,33 @@ const gistsTable = gists =>
       ${gists.map(gistTableRow).join("")}
     </tbody>
   </table>
+  ${loadingIndicator}
 `;
+};
+
+const sortGists = () => {
+  const {key} = headers.find(e => e.name === sortedBy);
+  gists.sort((a, b) => key(a).localeCompare(key(b)));
+
+  if (!sortAscending) {
+    gists.reverse();
+  }
+};
 
 const listenToHeaderClick = header => {
   header.addEventListener("click", ({target: {textContent}}) => {
-    let {key, ascending} = headers.find(e => e.name === textContent);
+    const headerConfig = headers.find(e => e.name === textContent);
 
     if (sortedBy === textContent) {
-      gists.reverse();
-      ascending = header.classList.contains("sorted-desc");
-    }
-    else {
+      sortAscending = !sortAscending;
+    } else {
       sortedBy = textContent;
-      gists.sort((a, b) => key(a).localeCompare(key(b)));
-
-      if (!ascending) {
-        gists.reverse();
-      }
+      sortAscending = headerConfig.ascending;
     }
 
+    sortGists();
     gistsToDOM(gists);
-    showSortedIcon(ascending);
+    showSortedIcon(sortAscending);
   });
 };
 
@@ -252,11 +287,13 @@ const showSortedIcon = ascending => {
   });
 };
 
-const handleGistsResponse = response => {
-  ({limits, gists} = response);
+const handlePage = ({chunk, limits: pageLimits}) => {
+  gists.push(...chunk);
+  limits = pageLimits;
+  sortGists();
   limitsToDOM(limits);
   gistsToDOM(gists);
-  showSortedIcon(headers.find(e => e.name === sortedBy).ascending);
+  showSortedIcon(sortAscending);
 };
 
 const handleError = err => {
@@ -268,15 +305,25 @@ const handleError = err => {
 const searchGists = username => {
   const submit = document.querySelector(".gist-search [type='submit']");
   submit.disabled = true;
-  fetchGists(username)
-    .then(handleGistsResponse)
+  gists = [];
+  isLoading = true;
+  sortedBy = "Created";
+  sortAscending = false;
+  gistsToDOM(gists);
+
+  fetchGists({username, handlePage})
     .catch(handleError)
-    .finally(() => submit.disabled = false);
+    .finally(() => {
+      submit.disabled = false;
+      isLoading = false;
+      gistsToDOM(gists);
+      showSortedIcon(sortAscending);
+    });
 };
 
 const trySearchFromURLParam = () => {
   const username = new URLSearchParams(window.location.search).get("username");
-  
+
   if (username) {
     const unEl = document.querySelector(".github-username");
     unEl.value = username;
@@ -285,7 +332,8 @@ const trySearchFromURLParam = () => {
 };
 
 const listenForSubmit = () => {
-  document.querySelector(".gist-search")
+  document
+    .querySelector(".gist-search")
     .addEventListener("submit", event => {
       event.preventDefault();
       const {value} = event.target.querySelector(".github-username");
@@ -294,8 +342,10 @@ const listenForSubmit = () => {
 };
 
 let limits;
-let gists;
+let gists = [];
 let sortedBy = "Created";
+let sortAscending = false;
+let isLoading = false;
 
 const headers = Object.freeze([
   {
